@@ -1,10 +1,18 @@
 import express from "express";
 import path from "path";
-
+import dotenv from "dotenv"; // Importa la librería dotenv
 import { loadApiEndpoints } from "./controllers/api";
+import { BoardsFunctions } from "./controllers/boards.controller"
+const cors = require('cors');
+
+
+
+// Carga las variables de entorno desde el archivo .env
+dotenv.config();
 
 // Create Express server
 const app = express();
+app.use(cors())
 
 // Express configuration
 app.set("port", process.env.PORT ?? 3000);
@@ -14,5 +22,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "../public"), { maxAge: 31557600000 }));
 
 loadApiEndpoints(app);
+BoardsFunctions(app)
+
 
 export default app;
