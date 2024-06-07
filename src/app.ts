@@ -12,7 +12,11 @@ dotenv.config();
 
 // Create Express server
 const app = express();
-app.use(cors())
+app.use(cors({
+    origin: 'https://kanban365.ez-marketing-us.com', // Cambia esto por el dominio de tu frontend
+    methods: 'GET,POST,PUT,DELETE',
+    allowedHeaders: 'Content-Type,Authorization'
+  }));
 
 // Express configuration
 app.set("port", process.env.PORT ?? 3000);
