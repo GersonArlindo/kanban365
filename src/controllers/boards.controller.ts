@@ -1,16 +1,22 @@
 import { Application, Request, Response } from "express";
-import BoardsData from "../../data/courses.json";
 import Boards  from "../models/boards"
 import Columns  from "../models/columns"
 import Tasks  from "../models/tasks"
 import SubTasks  from "../models/subtasks"
+import { authenticateJWT, CustomRequest  } from "../helpers/auth.middleware"; // Importa el middleware
+
 
 export const BoardsFunctions = (app: Application): void => {
 
-	app.get("/boards", async (req: Request, res: Response) => {
+	app.get("/boards", authenticateJWT, async (req: CustomRequest, res: Response) => {
+        const { tenant_id, created_by } = req;
+
+        if (!tenant_id || !created_by) {
+            return res.sendStatus(403); // Debería ser imposible llegar aquí si el middleware funciona correctamente
+        }
         try {
             // Obtener todos los tableros
-            const boardsValue = await Boards.findAll();
+            const boardsValue = await Boards.findAll({ where: { tenant_id, created_by } });
 
             // Para cada tablero, obtener sus columnas, tareas y subtareas
             const boardsData = await Promise.all(boardsValue.map(async (board: any) => {
@@ -66,7 +72,7 @@ export const BoardsFunctions = (app: Application): void => {
     });
 
     // Ruta POST de ejemplo
-    app.post("/board/add", async (req: Request, res: Response) => {
+    app.post("/board/add", authenticateJWT, async (req: Request, res: Response) => {
         // Asumimos que el cuerpo de la solicitud contiene un objeto JSON con los datos del nuevo tablero
         const { name, columns } = req.body;
         try {
@@ -92,7 +98,7 @@ export const BoardsFunctions = (app: Application): void => {
     });
 
     // Ruta PUT para actualizar un tablero existente
-    app.put("/board/edit/:id", async (req: Request, res: Response) => {
+    app.put("/board/edit/:id", authenticateJWT, async (req: Request, res: Response) => {
         const boardId = req.params.id;
         const { name, columns } = req.body;
 
@@ -149,7 +155,7 @@ export const BoardsFunctions = (app: Application): void => {
         }
     });
 
-    app.delete("/board/delete/:id", async (req: Request, res: Response) => {
+    app.delete("/board/delete/:id", authenticateJWT, async (req: Request, res: Response) => {
         const boardId = req.params.id;
 
         try {
@@ -184,7 +190,7 @@ export const BoardsFunctions = (app: Application): void => {
     });
 
     // Ruta POST para crear una nueva tarea
-    app.post("/task/add", async (req: Request, res: Response) => {
+    app.post("/task/add", authenticateJWT, async (req: Request, res: Response) => {
     const { columnId, title, description, status, subtasks } = req.body;
 
     try {
@@ -221,7 +227,7 @@ export const BoardsFunctions = (app: Application): void => {
     });
 
     // Ruta PUT para editar una tarea existente
-    app.put("/task/edit/:id", async (req: Request, res: Response) => {
+    app.put("/task/edit/:id", authenticateJWT, async (req: Request, res: Response) => {
         const taskId = req.params.id;
         const { columnId, title, description, status, subtasks } = req.body;
     
@@ -284,7 +290,7 @@ export const BoardsFunctions = (app: Application): void => {
     });
 
     //Ruta PUT para cambiar de status a una tarea
-    app.put("/task/change-status/:id", async (req: Request, res: Response) => {
+    app.put("/task/change-status/:id", authenticateJWT, async (req: Request, res: Response) => {
         const taskId = req.params.id;
         const { status, columnId } = req.body;
     
@@ -309,7 +315,7 @@ export const BoardsFunctions = (app: Application): void => {
     });
 
     // Ruta PUT para cambiar el campo isCompleted de una subtarea
-    app.put("/subtask/toggle-completion/:id", async (req: Request, res: Response) => {
+    app.put("/subtask/toggle-completion/:id", authenticateJWT, async (req: Request, res: Response) => {
         const subtaskId = req.params.id;
         const { isCompleted } = req.body;
 
@@ -333,7 +339,7 @@ export const BoardsFunctions = (app: Application): void => {
     });
 
     // Ruta DELETE para eliminar una tarea junto con sus subtareas
-    app.delete("/task/delete/:id", async (req: Request, res: Response) => {
+    app.delete("/task/delete/:id", authenticateJWT, async (req: Request, res: Response) => {
         const taskId = req.params.id;
 
         try {

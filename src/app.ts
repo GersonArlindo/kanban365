@@ -3,7 +3,12 @@ import path from "path";
 import dotenv from "dotenv"; // Importa la librería dotenv
 import { loadApiEndpoints } from "./controllers/api";
 import { BoardsFunctions } from "./controllers/boards.controller"
+import { AuthFunctions } from "./controllers/auth.controller";
+import { usersFunction } from "./controllers/users.controller"
+
 const cors = require('cors');
+var fs = require('fs')
+var https = require('https')
 
 
 
@@ -12,6 +17,12 @@ dotenv.config();
 
 // Create Express server
 const app = express();
+
+https.createServer({
+    cert: fs.readFileSync(path.join(__dirname, 'server.crt')),
+    key: fs.readFileSync(path.join(__dirname, 'server.key'))
+}, app)
+
 app.use(cors())
 
 // Express configuration
@@ -22,7 +33,10 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "../public"), { maxAge: 31557600000 }));
 
 loadApiEndpoints(app);
-BoardsFunctions(app)
+BoardsFunctions(app);
+AuthFunctions(app); 
+usersFunction(app)
+
 
 
 export default app;
