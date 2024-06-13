@@ -55,7 +55,7 @@ export const AuthFunctions = (app: Application): void => {
                 rol_id: usuario.dataValues.rol_id,
                 rol_name: usuario.tbl_role.dataValues.rol_name,
                 status: usuario.dataValues.status,
-                created_by: usuario.dataValues.created_by,
+                created_by: usuario.dataValues.first_name + ' ' + usuario.dataValues.last_name,
                 tenant_id: usuario.dataValues.tenant_id
              }, secretKey, { expiresIn: '24h' });
             res.json({ token });
