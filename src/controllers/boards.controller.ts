@@ -72,18 +72,23 @@ export const BoardsFunctions = (app: Application): void => {
     });
 
     // Ruta POST de ejemplo
-    app.post("/board/add", authenticateJWT, async (req: Request, res: Response) => {
+    app.post("/board/add", authenticateJWT, async (req: CustomRequest, res: Response) => {
         // Asumimos que el cuerpo de la solicitud contiene un objeto JSON con los datos del nuevo tablero
         const { name, columns } = req.body;
+        const { tenant_id, created_by } = req;
+
+        if (!tenant_id || !created_by) {
+            return res.sendStatus(403); // Debería ser imposible llegar aquí si el middleware funciona correctamente
+        }
         try {
             // Crear el nuevo tablero
-            const newBoard: any = await Boards.create({ name, created_by: 'Arlindo Gonzalez', tenant_id: 'abc123' });
+            const newBoard: any = await Boards.create({ name, created_by, tenant_id });
             // Crear las columnas para el nuevo tablero
             const columnPromises = columns.map((column: any) => Columns.create({
                 name: column.name,
                 board_id: newBoard.id,
-                created_by: 'Arlindo Gonzalez', 
-                tenant_id: 'abc123'
+                created_by: created_by, 
+                tenant_id: tenant_id
             }));
             const createdColumns = await Promise.all(columnPromises);
             // Responder con el nuevo tablero y sus columnas
@@ -98,10 +103,14 @@ export const BoardsFunctions = (app: Application): void => {
     });
 
     // Ruta PUT para actualizar un tablero existente
-    app.put("/board/edit/:id", authenticateJWT, async (req: Request, res: Response) => {
+    app.put("/board/edit/:id", authenticateJWT, async (req: CustomRequest, res: Response) => {
         const boardId = req.params.id;
         const { name, columns } = req.body;
+        const { tenant_id, created_by } = req;
 
+        if (!tenant_id || !created_by) {
+            return res.sendStatus(403); // Debería ser imposible llegar aquí si el middleware funciona correctamente
+        }
         try {
             // Buscar el tablero existente
             const board: any = await Boards.findByPk(boardId);
@@ -131,8 +140,8 @@ export const BoardsFunctions = (app: Application): void => {
                     return Columns.create({
                         name: column.name,
                         board_id: boardId,
-                        created_by: 'Arlindo Gonzalez', 
-                        tenant_id: 'abc123'
+                        created_by: created_by, 
+                        tenant_id: tenant_id
                     });
                 }
             }));
@@ -190,8 +199,13 @@ export const BoardsFunctions = (app: Application): void => {
     });
 
     // Ruta POST para crear una nueva tarea
-    app.post("/task/add", authenticateJWT, async (req: Request, res: Response) => {
+    app.post("/task/add", authenticateJWT, async (req: CustomRequest, res: Response) => {
     const { columnId, title, description, status, subtasks } = req.body;
+    const { tenant_id, created_by } = req;
+
+    if (!tenant_id || !created_by) {
+        return res.sendStatus(403); // Debería ser imposible llegar aquí si el middleware funciona correctamente
+    }
 
     try {
         // Crear la nueva tarea
@@ -200,8 +214,8 @@ export const BoardsFunctions = (app: Application): void => {
             title: title,
             description: description,
             status: status,
-            created_by: 'Arlindo Gonzalez', 
-            tenant_id: 'abc123'
+            created_by: created_by, 
+            tenant_id: tenant_id
         });
 
         // Crear las subtareas para la nueva tarea
@@ -209,8 +223,8 @@ export const BoardsFunctions = (app: Application): void => {
             task_id: newTask.id,
             title: subtask.title,
             isCompleted: subtask.isCompleted,
-            created_by: 'Arlindo Gonzalez', 
-            tenant_id: 'abc123'
+            created_by: created_by, 
+            tenant_id: tenant_id
         }));
 
         const createdSubtasks = await Promise.all(subtaskPromises);
@@ -227,10 +241,14 @@ export const BoardsFunctions = (app: Application): void => {
     });
 
     // Ruta PUT para editar una tarea existente
-    app.put("/task/edit/:id", authenticateJWT, async (req: Request, res: Response) => {
+    app.put("/task/edit/:id", authenticateJWT, async (req: CustomRequest, res: Response) => {
         const taskId = req.params.id;
         const { columnId, title, description, status, subtasks } = req.body;
-    
+        const { tenant_id, created_by } = req;
+
+        if (!tenant_id || !created_by) {
+            return res.sendStatus(403); // Debería ser imposible llegar aquí si el middleware funciona correctamente
+        }
         try {
             // Buscar la tarea existente
             const task: any = await Tasks.findByPk(taskId);
@@ -267,8 +285,8 @@ export const BoardsFunctions = (app: Application): void => {
                         task_id: taskId,
                         title: subtask.title,
                         isCompleted: subtask.isCompleted,
-                        created_by: 'Arlindo Gonzalez',
-                        tenant_id: 'abc123'
+                        created_by: created_by,
+                        tenant_id: tenant_id
                     });
                 }
             }));
