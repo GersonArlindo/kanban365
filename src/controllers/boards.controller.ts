@@ -292,8 +292,9 @@ export const BoardsFunctions = (app: Application): void => {
             }));
     
             // Eliminar las subtareas que ya no están en la solicitud
-            await Promise.all(existingSubtasks.map((subtask: any) => subtask.destroy()));
-    
+            const subtasksToDelete = Array.from(existingSubtasksMap.values());
+            await Promise.all(subtasksToDelete.map((subtask: any) => subtask.destroy()));
+
             // Responder con la tarea actualizada y sus subtareas
             const updatedTaskWithSubtasks = {
                 ...task.toJSON(),
