@@ -1,8 +1,7 @@
 import { Application, Request, Response } from "express";
-import { authenticateJWT } from "../helpers/auth.middleware"; // Importa el middleware
+import { authenticateJWT, CustomRequest } from "../helpers/auth.middleware"; // Importa el middleware
 import Users from "../models/users"
 var bcrypt = require('bcryptjs');
-
 
 export const usersFunction = (app: Application): void => {
 const salt = bcrypt.genSaltSync();
@@ -19,6 +18,22 @@ const salt = bcrypt.genSaltSync();
             });
         } catch (error) {
             console.error("Error creating new user: ", error);
+            return res.status(500).send("Internal Server Error");
+        }
+    });
+
+    // Ruta GET para traer todos los usuarios
+    app.get("/users", authenticateJWT, async (req: CustomRequest, res: Response) => {
+        const { tenant_id } = req;
+        try {
+            const existingUser = await Users.findAll({ where: { tenant_id } });
+            if (existingUser) {
+                return res.status(200).json({ users: existingUser });
+            } else {
+                return res.status(200).json({ exists: false });
+            }
+        } catch (error) {
+            console.error("Error checking email existence: ", error);
             return res.status(500).send("Internal Server Error");
         }
     });
