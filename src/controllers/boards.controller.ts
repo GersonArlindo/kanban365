@@ -1,22 +1,35 @@
 import { Application, Request, Response } from "express";
 import Boards  from "../models/boards"
+import AssignedTo from "../models/assignedUsers"
+import Users from "../models/users"
 import Columns  from "../models/columns"
 import Tasks  from "../models/tasks"
 import SubTasks  from "../models/subtasks"
 import { authenticateJWT, CustomRequest  } from "../helpers/auth.middleware"; // Importa el middleware
 
+Boards.hasMany(AssignedTo, { foreignKey: "board_id" });
+AssignedTo.belongsTo(Boards, { foreignKey: "board_id" });
+
+Users.hasMany(AssignedTo, { foreignKey: "user_id" });
+AssignedTo.belongsTo(Users, { foreignKey: "user_id" });
 
 export const BoardsFunctions = (app: Application): void => {
 
 	app.get("/boards", authenticateJWT, async (req: CustomRequest, res: Response) => {
-        const { tenant_id, created_by } = req;
+        const {id, tenant_id, created_by } = req;
 
         if (!tenant_id || !created_by) {
             return res.sendStatus(403); // Debería ser imposible llegar aquí si el middleware funciona correctamente
         }
         try {
             // Obtener todos los tableros
-            const boardsValue = await Boards.findAll({ where: { tenant_id, created_by } });
+            const boardsValue = await Boards.findAll({ 
+                where: { tenant_id },
+                include: [{
+                    model: AssignedTo,
+                    where: { user_id: id }
+                }]
+             });
 
             // Para cada tablero, obtener sus columnas, tareas y subtareas
             const boardsData = await Promise.all(boardsValue.map(async (board: any) => {
@@ -74,8 +87,8 @@ export const BoardsFunctions = (app: Application): void => {
     // Ruta POST de ejemplo
     app.post("/board/add", authenticateJWT, async (req: CustomRequest, res: Response) => {
         // Asumimos que el cuerpo de la solicitud contiene un objeto JSON con los datos del nuevo tablero
-        const { name, columns } = req.body;
-        const { tenant_id, created_by } = req;
+        const {assignedTo, name, columns } = req.body;
+        const {id, tenant_id, created_by } = req;
 
         if (!tenant_id || !created_by) {
             return res.sendStatus(403); // Debería ser imposible llegar aquí si el middleware funciona correctamente
@@ -91,6 +104,27 @@ export const BoardsFunctions = (app: Application): void => {
                 tenant_id: tenant_id
             }));
             const createdColumns = await Promise.all(columnPromises);
+
+            // Agrega el id al arreglo assignedTo
+            if (Array.isArray(assignedTo) && id) {
+                assignedTo.push(id);
+            }
+
+            // Elimina los duplicados usando Set
+            const uniqueAssignedTo = Array.from(new Set(assignedTo));
+
+            // Mapea el arreglo uniqueAssignedTo para crear los registros en la base de datos
+            const usersAssignedToSave = uniqueAssignedTo.map((user: any) => AssignedTo.create({
+                board_id: newBoard.id,
+                user_id: user,
+                owner: user == id ? 1 : 0,
+                created_by: created_by,
+                tenant_id: tenant_id
+            }));
+
+            // Ejecuta todas las promesas para crear los registros
+            const createdAssignedUsers = await Promise.all(usersAssignedToSave);
+
             // Responder con el nuevo tablero y sus columnas
             return res.status(201).json({
                 board: newBoard,
@@ -197,6 +231,39 @@ export const BoardsFunctions = (app: Application): void => {
             return res.status(500).send("Internal Server Error");
         }
     });
+
+    app.get("/board/assignedUsers/:board_id", authenticateJWT, async (req: Request, res: Response) => {
+        const boardId = req.params.board_id;
+        try {
+            const users = await AssignedTo.findAll({ 
+                include: [
+                    {
+                      model: Users,
+                      attributes: [
+                        "id",
+                        "first_name",
+                        "last_name",
+                        "username",
+                        "user_image",
+                        "email",
+                        "phone_number",
+                        "rol_id",
+                        "status",
+                        "created_by",
+                        "tenant_id"
+                      ],
+                    },
+                  ],
+                where: { board_id: boardId } });
+                const responseData = {
+                    assignedUsers: users
+                };
+                return res.status(200).json(responseData);
+        } catch (error) {
+            console.error("Error changing task status: ", error);
+            return res.status(500).send("Internal Server Error");
+        }
+    })
 
     // Ruta POST para crear una nueva tarea
     app.post("/task/add", authenticateJWT, async (req: CustomRequest, res: Response) => {

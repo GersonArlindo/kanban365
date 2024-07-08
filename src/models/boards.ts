@@ -1,7 +1,7 @@
 import { DataTypes } from "sequelize";
 import db from "../db/connection.db";
 
-const Boards = db.define('tbl_boards',{
+const Boards = db.define('tbl_boards', {
     id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
