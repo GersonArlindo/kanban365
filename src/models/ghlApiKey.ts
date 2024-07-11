@@ -1,39 +1,27 @@
 import { DataTypes } from "sequelize";
 import db from "../db/connection.db";
 
-const Tasks = db.define('tbl_tasks',{
+const GHLApiKey = db.define('tbl_ghl_api_keys',{
     id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,
         allowNull: true,
     },
-    column_id: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-    },
-    title: {
+    name: {
         type: DataTypes.STRING,
         allowNull: true,
     },
-    description: {
+    api_key: {
+        type: DataTypes.STRING,
+        allowNull: true,
+    },
+    location_id: {
         type: DataTypes.STRING,
         allowNull: true,
     },
     status: {
-        type: DataTypes.STRING,
-        allowNull: true,
-    },
-    startDate:{
-        type: DataTypes.STRING,
-        allowNull: true,
-    },
-    dueDate:{
-        type: DataTypes.STRING,
-        allowNull: true,
-    },
-    durationText:{
-        type: DataTypes.STRING,
+        type: DataTypes.NUMBER,
         allowNull: true,
     },
     date_created: {
@@ -50,4 +38,4 @@ const Tasks = db.define('tbl_tasks',{
     }
 });
 
-export default Tasks;
+export default GHLApiKey;

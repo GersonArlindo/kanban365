@@ -1,6 +1,7 @@
 import { Application, Request, Response } from "express";
 import Boards  from "../models/boards"
 import AssignedTo from "../models/assignedUsers"
+import AssignedToTask from "../models/assignedUsersToTask";
 import Users from "../models/users"
 import Columns  from "../models/columns"
 import Tasks  from "../models/tasks"
@@ -45,6 +46,9 @@ export const BoardsFunctions = (app: Application): void => {
                             title: task.title,
                             description: task.description,
                             status: task.status,
+                            startDate: task.startDate,
+                            dueDate: task.dueDate,
+                            durationText: task.durationText,
                             created_by: task.created_by,
                             tenant_id: task.tenant_id,
                             subtasks: subtasks.map((subtask: any) => ({
@@ -267,16 +271,18 @@ export const BoardsFunctions = (app: Application): void => {
 
     // Ruta POST para crear una nueva tarea
     app.post("/task/add", authenticateJWT, async (req: CustomRequest, res: Response) => {
-    const { columnId, title, description, status, subtasks } = req.body;
-    const { tenant_id, created_by } = req;
+    const {assignedTo, startDate, dueDate, durationText, columnId, title, description, status, subtasks } = req.body;
+    const {id, tenant_id, created_by } = req;
 
     if (!tenant_id || !created_by) {
         return res.sendStatus(403); // Debería ser imposible llegar aquí si el middleware funciona correctamente
     }
-
     try {
         // Crear la nueva tarea
         const newTask: any = await Tasks.create({
+            startDate: startDate,
+            dueDate: dueDate,
+            durationText: durationText,
             column_id: columnId,
             title: title,
             description: description,
@@ -295,6 +301,25 @@ export const BoardsFunctions = (app: Application): void => {
         }));
 
         const createdSubtasks = await Promise.all(subtaskPromises);
+
+        // Agrega el id al arreglo assignedTo
+        if (Array.isArray(assignedTo) && id) {
+            assignedTo.push(id);
+        }
+
+        // Elimina los duplicados usando Set
+        const uniqueAssignedTo = Array.from(new Set(assignedTo));
+
+        // Mapea el arreglo uniqueAssignedTo para crear los registros en la base de datos
+        const usersAssignedToSave = uniqueAssignedTo.map((user: any) => AssignedToTask.create({
+            task_id: newTask.id,
+            user_id: user,
+            created_by: created_by,
+            tenant_id: tenant_id
+        }));
+
+        // Ejecuta todas las promesas para crear los registros
+        const createdAssignedUsers = await Promise.all(usersAssignedToSave);
 
         // Responder con la nueva tarea y sus subtareas
         return res.status(201).json({

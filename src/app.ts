@@ -5,6 +5,7 @@ import { loadApiEndpoints } from "./controllers/api";
 import { BoardsFunctions } from "./controllers/boards.controller"
 import { AuthFunctions } from "./controllers/auth.controller";
 import { usersFunction } from "./controllers/users.controller"
+import { ghlApiKeyFunction } from './controllers/ghlApiKey.controller'
 
 const cors = require('cors');
 var fs = require('fs')
@@ -35,7 +36,8 @@ app.use(express.static(path.join(__dirname, "../public"), { maxAge: 31557600000 
 loadApiEndpoints(app);
 BoardsFunctions(app);
 AuthFunctions(app); 
-usersFunction(app)
+usersFunction(app);
+ghlApiKeyFunction(app);
 
 
 

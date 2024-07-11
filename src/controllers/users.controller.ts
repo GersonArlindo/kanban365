@@ -6,7 +6,7 @@ var bcrypt = require('bcryptjs');
 export const usersFunction = (app: Application): void => {
 const salt = bcrypt.genSaltSync();
     // Ruta POST de ejemplo
-    app.post("/user/add", authenticateJWT, async (req: Request, res: Response) => {
+    app.post("/user/add", async (req: Request, res: Response) => {
         // Asumimos que el cuerpo de la solicitud contiene un objeto JSON con los datos del nuevo tablero
         const { first_name, last_name, user_image, email, phone_number, rol_id, status, password, created_by, tenant_id } = req.body;
         try {
@@ -53,5 +53,4 @@ const salt = bcrypt.genSaltSync();
             return res.status(500).send("Internal Server Error");
         }
     });
-
 };
