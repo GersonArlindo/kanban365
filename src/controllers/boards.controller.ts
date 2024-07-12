@@ -14,11 +14,17 @@ AssignedTo.belongsTo(Boards, { foreignKey: "board_id" });
 Users.hasMany(AssignedTo, { foreignKey: "user_id" });
 AssignedTo.belongsTo(Users, { foreignKey: "user_id" });
 
+Tasks.hasMany(AssignedToTask, { foreignKey: "task_id" });
+AssignedToTask.belongsTo(Tasks, { foreignKey: "task_id" });
+
+Users.hasMany(AssignedToTask, { foreignKey: "user_id" });
+AssignedToTask.belongsTo(Users, { foreignKey: "user_id" });
+
 export const BoardsFunctions = (app: Application): void => {
 
-	app.get("/boards", authenticateJWT, async (req: CustomRequest, res: Response) => {
-        const {id, tenant_id, created_by } = req;
-
+    app.get("/boards", authenticateJWT, async (req: CustomRequest, res: Response) => {
+        const { id, tenant_id, created_by } = req;
+    
         if (!tenant_id || !created_by) {
             return res.sendStatus(403); // Debería ser imposible llegar aquí si el middleware funciona correctamente
         }
@@ -31,16 +37,54 @@ export const BoardsFunctions = (app: Application): void => {
                     where: { user_id: id }
                 }]
              });
-
+    
             // Para cada tablero, obtener sus columnas, tareas y subtareas
             const boardsData = await Promise.all(boardsValue.map(async (board: any) => {
                 const columns = await Columns.findAll({ where: { board_id: board.id } });
-
+    
                 const columnsData = await Promise.all(columns.map(async (column: any) => {
-                    const tasks = await Tasks.findAll({ where: { column_id: column.id } });
-
+                    const tasks = await Tasks.findAll({ 
+                        where: { column_id: column.id },
+                        include: [{ model: AssignedToTask }] // Incluye los usuarios de la tarea
+                    });
+    
                     const tasksData = await Promise.all(tasks.map(async (task: any) => {
                         const subtasks = await SubTasks.findAll({ where: { task_id: task.id } });
+    
+                        // Obtener usuarios asignados a la tarea
+                        const taskUsers = await AssignedToTask.findAll({ 
+                            include:[
+                                {   model: Users,
+                                    attributes: [
+                                      "id",
+                                      "first_name",
+                                      "last_name",
+                                      "username",
+                                      "user_image",
+                                      "email",
+                                      "phone_number",
+                                      "rol_id",
+                                      "status",
+                                      "created_by",
+                                      "tenant_id",
+                                    ],}
+                            ],
+                            where: { task_id: task.id } });
+                        console.log(taskUsers)
+                        const assignedUsers = taskUsers.map((taskUser: any) => ({
+                            first_name: taskUser?.dataValues?.tbl_user?.first_name,
+                            last_name: taskUser?.dataValues?.tbl_user?.last_name,
+                            username: taskUser?.dataValues?.tbl_user?.username,
+                            user_image: taskUser?.dataValues?.tbl_user?.user_image,
+                            email: taskUser?.dataValues?.tbl_user?.email,
+                            phone_number: taskUser?.dataValues?.tbl_user?.phone_number,
+                            rol_id: taskUser?.dataValues?.tbl_user?.rol_id,
+                            status: taskUser?.dataValues?.tbl_user?.status,
+                            user_id: taskUser.user_id,
+                            created_by: taskUser?.dataValues?.tbl_user?.created_by,
+                            tenant_id: taskUser?.dataValues?.tbl_user?.tenant_id
+                        }));
+    
                         return {
                             id: task.id,
                             title: task.title,
@@ -57,10 +101,11 @@ export const BoardsFunctions = (app: Application): void => {
                                 isCompleted: subtask.isCompleted,
                                 created_by: subtask.created_by,
                                 tenant_id: subtask.tenant_id,
-                            }))
+                            })),
+                            assignedUsers: assignedUsers // Añadir usuarios asignados a la tarea
                         };
                     }));
-
+    
                     return {
                         id: column.id,
                         name: column.name,
@@ -69,7 +114,7 @@ export const BoardsFunctions = (app: Application): void => {
                         tasks: tasksData
                     };
                 }));
-
+    
                 return {
                     id: board.id,
                     name: board.name,
@@ -303,7 +348,7 @@ export const BoardsFunctions = (app: Application): void => {
         const createdSubtasks = await Promise.all(subtaskPromises);
 
         // Agrega el id al arreglo assignedTo
-        if (Array.isArray(assignedTo) && id) {
+        if (Array.isArray(assignedTo) && id && assignedTo.length <= 0) {
             assignedTo.push(id);
         }
 
@@ -335,7 +380,7 @@ export const BoardsFunctions = (app: Application): void => {
     // Ruta PUT para editar una tarea existente
     app.put("/task/edit/:id", authenticateJWT, async (req: CustomRequest, res: Response) => {
         const taskId = req.params.id;
-        const { columnId, title, description, status, subtasks } = req.body;
+        const { columnId, startDate, dueDate, durationText, title, description, status, subtasks } = req.body;
         const { tenant_id, created_by } = req;
 
         if (!tenant_id || !created_by) {
@@ -353,6 +398,9 @@ export const BoardsFunctions = (app: Application): void => {
             task.title = title;
             task.description = description;
             task.status = status;
+            task.startDate = startDate;
+            task.dueDate = dueDate;
+            task.durationText = durationText;
             await task.save();
     
             // Obtener las subtareas existentes de la tarea

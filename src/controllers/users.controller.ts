@@ -22,6 +22,29 @@ const salt = bcrypt.genSaltSync();
         }
     });
 
+    // Ruta para desactivar un usuario
+    app.put("/user/deactivate/:id", async (req: Request, res: Response) => {
+        const userId = req.params.id;
+        try {
+            const user: any = await Users.findByPk(userId); // Buscar usuario por ID
+            if (user) {
+                user.status = 0; // Cambiar el status del usuario a 0 (desactivado)
+                await user.save(); // Guardar los cambios
+                return res.status(200).json({
+                    user,
+                    msj: "User deactivated"
+                });
+            } else {
+                return res.status(404).json({
+                    msj: "User not found"
+                });
+            }
+        } catch (error) {
+            console.error("Error deactivating user: ", error);
+            return res.status(500).send("Internal Server Error");
+        }
+    });
+
     // Ruta GET para traer todos los usuarios
     app.get("/users", authenticateJWT, async (req: CustomRequest, res: Response) => {
         const { tenant_id } = req;

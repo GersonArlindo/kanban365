@@ -43,7 +43,6 @@ export const AuthFunctions = (app: Application): void => {
         }
 
         if (usuario) {
-            console.log(usuario)
             const token = jwt.sign({ 
                 id: usuario.dataValues.id,
                 first_name: usuario.dataValues.first_name,
