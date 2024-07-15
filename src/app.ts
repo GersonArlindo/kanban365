@@ -6,6 +6,7 @@ import { BoardsFunctions } from "./controllers/boards.controller"
 import { AuthFunctions } from "./controllers/auth.controller";
 import { usersFunction } from "./controllers/users.controller"
 import { ghlApiKeyFunction } from './controllers/ghlApiKey.controller'
+import { triggersFunction } from "./controllers/triggerFunctions.controller";
 
 const cors = require('cors');
 var fs = require('fs')
@@ -38,6 +39,7 @@ BoardsFunctions(app);
 AuthFunctions(app); 
 usersFunction(app);
 ghlApiKeyFunction(app);
+triggersFunction(app)
 
 
 

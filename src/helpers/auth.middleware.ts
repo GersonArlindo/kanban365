@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 
 const secretKey = process.env.JWT_SECRET || "ik+-d8a3e*nio47=%n@#pbe-pr9x!5ths269g4++##3v-*oejb"; // Asegúrate de configurar esta variable de entorno
 
+//*El CustomRequest lo que hara es que me estara devolviendo estas 3 propiedades en base al Jwt
 export interface CustomRequest extends Request {
     id?: number;
     tenant_id?: string;
