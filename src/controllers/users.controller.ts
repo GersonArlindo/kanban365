@@ -1,17 +1,19 @@
 import { Application, Request, Response } from "express";
 import { authenticateJWT, CustomRequest } from "../helpers/auth.middleware"; // Importa el middleware
 import Users from "../models/users"
+import { triggerWorkflows } from "./getAssociatedTriggers";
 var bcrypt = require('bcryptjs');
 
 export const usersFunction = (app: Application): void => {
 const salt = bcrypt.genSaltSync();
     // Ruta POST de ejemplo
-    app.post("/user/add", async (req: Request, res: Response) => {
+    app.post("/user/add", authenticateJWT, async (req: CustomRequest, res: Response) => {
         // Asumimos que el cuerpo de la solicitud contiene un objeto JSON con los datos del nuevo tablero
         const { first_name, last_name, user_image, email, phone_number, rol_id, status, password, created_by, tenant_id } = req.body;
         try {
             const Newpassword = bcrypt.hashSync(password, salt);
             const newUser: any = await Users.create({ first_name, last_name, username: `${first_name} ${last_name}`, user_image, email, phone_number, rol_id, status, password: Newpassword, created_by, tenant_id });
+            const workflowExecution = await triggerWorkflows(9, tenant_id,  newUser);
             return res.status(201).json({
                 user: newUser,
                 msj: "Created"

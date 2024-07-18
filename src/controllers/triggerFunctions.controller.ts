@@ -3,9 +3,10 @@ import { authenticateJWT, CustomRequest } from "../helpers/auth.middleware"; // 
 import Users from "../models/users"
 import {TriggerFunctions, AssociatedTriggerFunctions} from '../models/triggerFunctions'
 
+AssociatedTriggerFunctions.belongsTo(TriggerFunctions, { foreignKey: "trigger_id" });
+TriggerFunctions.hasMany(AssociatedTriggerFunctions, { foreignKey: "trigger_id" });
 
 export const triggersFunction = (app: Application): void => {
-
     //*FUNCIONES PARA LOS TRIGGERS DEL SISTEMA
     // Ruta POST de ejemplo
     app.post("/trigger/add", authenticateJWT, async (req: Request, res: Response) => {
@@ -84,9 +85,10 @@ export const triggersFunction = (app: Application): void => {
         }
     });
 
-    app.get("/associatedTrigger", authenticateJWT, async (req: Request, res: Response) => {
+    app.get("/associatedTrigger", authenticateJWT, async (req: CustomRequest, res: Response) => {
+        const {id, tenant_id, created_by } = req;
         try {
-            const existingAssociatedTriggers = await AssociatedTriggerFunctions.findAll();
+            const existingAssociatedTriggers = await AssociatedTriggerFunctions.findAll({ where: { tenant_id: tenant_id }});
             if (existingAssociatedTriggers) {
                 return res.status(200).json({ triggers: existingAssociatedTriggers });
             } else {
@@ -97,17 +99,82 @@ export const triggersFunction = (app: Application): void => {
         }
     });
 
-    app.get("/associatedTrigger/:id", authenticateJWT, async (req: Request, res: Response) => {
-        const triggerId = req.params.id;
+    //*Esta funcion nos servira para poder traer los workflows asociados mediante el  id del trigger que vienen en un array
+    app.post("/associatedTriggers", authenticateJWT, async (req: CustomRequest, res: Response) => {
+        const triggerIds: string[] = req.body.ids;
+        const {id, tenant_id, created_by } = req;
+        if (!Array.isArray(triggerIds)) {
+            return res.status(400).send("Bad Request: 'ids' should be an array");
+        }
+    
         try {
-            const existingAssociatedTriggers = await AssociatedTriggerFunctions.findAll({ where: { trigger_id: triggerId }  });
-            if (existingAssociatedTriggers) {
-                return res.status(200).json({ triggers: existingAssociatedTriggers });
-            } else {
-                return res.status(200).json({ exists: false });
+            const results = [];
+            for (const triggerId of triggerIds) {
+                const associatedTriggers: any = await AssociatedTriggerFunctions.findAll({
+                    where: { 
+                        trigger_id: triggerId,
+                        tenant_id: tenant_id
+                     },
+                    include: [
+                        {
+                            model: TriggerFunctions,
+                            attributes: ["id", "name", "description"],
+                        },
+                    ],
+                });
+
+                if (associatedTriggers.length > 0) {
+                    for (const trigger of associatedTriggers) {
+                        results.push({
+                            trigger_id: triggerId,
+                            name: trigger.tbl_trigger_function.dataValues.name,
+                            id: trigger.id,
+                            trigger_link: trigger.trigger_link,
+                            status: trigger.status,
+                            date_created: trigger.date_created,
+                            created_by: trigger.created_by,
+                            tenant_id: trigger.tenant_id,
+                            trigger_function: trigger.TriggerFunction, // Esto incluirá el objeto con id, name y description
+                        });
+                    }
+                } else {
+                    results.push({
+                        trigger_id: triggerId,
+                        exists: false,
+                    });
+                }
             }
+
+            return res.status(200).json(results);
         } catch (error) {
+            console.error(error);
             return res.status(500).send("Internal Server Error");
         }
     });
+
+    app.delete("/associatedTriggers/delete/:id", authenticateJWT, async (req, res) => {
+        const id = req.params.id; // Obtiene el ID del registro a eliminar
+    
+        try {
+            // Busca el registro asociado por su ID
+            const associatedTrigger = await AssociatedTriggerFunctions.findByPk(id);
+            
+            if (!associatedTrigger) {
+                return res.status(404).send("Not Found");
+            }
+    
+            // Elimina el registro asociado
+            await associatedTrigger.destroy();
+    
+            // Devuelve una respuesta exitosa
+            return res.status(200).json({
+                user: associatedTrigger,
+                msj: "Deleted"
+            });
+        } catch (error) {
+            console.error(error);
+            return res.status(500).send("Error interno del servidor");
+        }
+    });
+    
 };

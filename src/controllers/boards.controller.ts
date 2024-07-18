@@ -7,6 +7,10 @@ import Columns  from "../models/columns"
 import Tasks  from "../models/tasks"
 import SubTasks  from "../models/subtasks"
 import { authenticateJWT, CustomRequest  } from "../helpers/auth.middleware"; // Importa el middleware
+import { triggerWorkflows } from "./getAssociatedTriggers";
+import cron from 'node-cron';
+import { Op } from "sequelize";
+
 
 Boards.hasMany(AssignedTo, { foreignKey: "board_id" });
 AssignedTo.belongsTo(Boards, { foreignKey: "board_id" });
@@ -173,7 +177,11 @@ export const BoardsFunctions = (app: Application): void => {
 
             // Ejecuta todas las promesas para crear los registros
             const createdAssignedUsers = await Promise.all(usersAssignedToSave);
-
+            const data = {
+                newBoard,
+                createdColumns
+            };
+            const workflowExecution = await triggerWorkflows(1, tenant_id,  data);
             // Responder con el nuevo tablero y sus columnas
             return res.status(201).json({
                 board: newBoard,
@@ -234,7 +242,11 @@ export const BoardsFunctions = (app: Application): void => {
                 !columns.some((col: any) => col.id === column.id)
             );
             await Promise.all(columnsToDelete.map((column: any) => column.destroy()));
-
+            const data = {
+                board,
+                updatedColumns
+            };
+            const workflowExecution = await triggerWorkflows(2, tenant_id,  data);
             // Responder con el tablero actualizado y sus columnas
             return res.status(200).json({
                 board,
@@ -247,9 +259,12 @@ export const BoardsFunctions = (app: Application): void => {
         }
     });
 
-    app.delete("/board/delete/:id", authenticateJWT, async (req: Request, res: Response) => {
+    app.delete("/board/delete/:id", authenticateJWT, async (req: CustomRequest, res: Response) => {
         const boardId = req.params.id;
-
+        const { tenant_id, created_by } = req;
+        if (!tenant_id || !created_by) {
+            return res.sendStatus(403); // Debería ser imposible llegar aquí si el middleware funciona correctamente
+        }
         try {
             // Encuentra todas las columnas del tablero
             const columns = await Columns.findAll({ where: { board_id: boardId } });
@@ -268,8 +283,13 @@ export const BoardsFunctions = (app: Application): void => {
             // Eliminar todas las columnas del tablero
             await Columns.destroy({ where: { board_id: boardId } });
 
+            //buscamos el tablero para enviarlo al workflow
+            const board: any = await Boards.findByPk(boardId);
+
             // Finalmente, eliminar el tablero
             await Boards.destroy({ where: { id: boardId } });
+
+            const workflowExecution = await triggerWorkflows(3, tenant_id,  board);
 
             return res.status(200).json({
                 msj: "Board and all associated columns, tasks, and subtasks deleted successfully"
@@ -366,6 +386,11 @@ export const BoardsFunctions = (app: Application): void => {
         // Ejecuta todas las promesas para crear los registros
         const createdAssignedUsers = await Promise.all(usersAssignedToSave);
 
+        const data: any = {
+            ...newTask.toJSON(),
+            subtasks: createdSubtasks
+        }
+        const workflowExecution = await triggerWorkflows(4, tenant_id,  data);
         // Responder con la nueva tarea y sus subtareas
         return res.status(201).json({
             ...newTask.toJSON(),
@@ -440,6 +465,8 @@ export const BoardsFunctions = (app: Application): void => {
                 ...task.toJSON(),
                 subtasks: updatedSubtasks
             };
+
+            const workflowExecution = await triggerWorkflows(5, tenant_id,  updatedTaskWithSubtasks);
     
             return res.status(200).json(updatedTaskWithSubtasks);
         } catch (error) {
@@ -474,10 +501,13 @@ export const BoardsFunctions = (app: Application): void => {
     });
 
     // Ruta PUT para cambiar el campo isCompleted de una subtarea
-    app.put("/subtask/toggle-completion/:id", authenticateJWT, async (req: Request, res: Response) => {
+    app.put("/subtask/toggle-completion/:id", authenticateJWT, async (req: CustomRequest, res: Response) => {
         const subtaskId = req.params.id;
         const { isCompleted } = req.body;
-
+        const { tenant_id, created_by } = req;
+        if (!tenant_id || !created_by) {
+            return res.sendStatus(403); // Debería ser imposible llegar aquí si el middleware funciona correctamente
+        }
         try {
             // Buscar la subtarea existente
             const subtask: any = await SubTasks.findByPk(subtaskId);
@@ -488,7 +518,7 @@ export const BoardsFunctions = (app: Application): void => {
             // Actualizar el campo isCompleted de la subtarea
             subtask.isCompleted = isCompleted;
             await subtask.save();
-
+            const workflowExecution = await triggerWorkflows(7, tenant_id, subtask);
             // Responder con la subtarea actualizada
             return res.status(200).json(subtask);
         } catch (error) {
@@ -498,9 +528,13 @@ export const BoardsFunctions = (app: Application): void => {
     });
 
     // Ruta DELETE para eliminar una tarea junto con sus subtareas
-    app.delete("/task/delete/:id", authenticateJWT, async (req: Request, res: Response) => {
+    app.delete("/task/delete/:id", authenticateJWT, async (req: CustomRequest, res: Response) => {
         const taskId = req.params.id;
+        const { tenant_id, created_by } = req;
 
+        if (!tenant_id || !created_by) {
+            return res.sendStatus(403); // Debería ser imposible llegar aquí si el middleware funciona correctamente
+        }
         try {
             // Buscar la tarea existente
             const task: any = await Tasks.findByPk(taskId);
@@ -514,6 +548,7 @@ export const BoardsFunctions = (app: Application): void => {
             // Eliminar la tarea
             await Tasks.destroy({ where: { id: taskId } });
 
+            const workflowExecution = await triggerWorkflows(6, tenant_id,  task);
             // Responder con un mensaje de éxito
             return res.status(200).json("Task and its subtasks deleted successfully");
         } catch (error) {
@@ -521,6 +556,35 @@ export const BoardsFunctions = (app: Application): void => {
             return res.status(500).send("Internal Server Error");
         }
     });
+
+    async function sendNotification(task: any){
+        console.log(task)
+    }
+
+    async function checkExpiredTasks() {
+        const now = new Date();
+        
+        const expiredTasks: any = await Tasks.findAll({
+            where: {
+                dueDate: {
+                    [Op.lt]: now
+                },
+                notified: 0 // Suponiendo que tengas un campo 'notified' para marcar tareas ya notificadas
+            }
+        });
+    
+        for (const task of expiredTasks) {
+            // Aquí puedes manejar la lógica de la tarea vencida, como marcarla como notificada
+            task.notified = 1;
+            await task.save();
+    
+            // Llama a tu función de notificación
+            await sendNotification(task); // Ajusta esta llamada según tu implementación
+        }
+    }
+    
+    // Programar la tarea para que se ejecute cada minuto
+    cron.schedule('* * * * *', checkExpiredTasks);
 
 };
 
