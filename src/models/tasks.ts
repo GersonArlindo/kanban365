@@ -36,6 +36,10 @@ const Tasks = db.define('tbl_tasks',{
         type: DataTypes.STRING,
         allowNull: true,
     },
+    notified: {
+        type: DataTypes.STRING,
+        allowNull: true,
+    },
     date_created: {
         type: DataTypes.STRING,
         allowNull: true,

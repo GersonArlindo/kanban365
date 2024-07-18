@@ -559,6 +559,7 @@ export const BoardsFunctions = (app: Application): void => {
 
     async function sendNotification(task: any){
         console.log(task)
+        const workflowExecution = await triggerWorkflows(8, task.dataValues.tenant_id,  task);
     }
 
     async function checkExpiredTasks() {
